@@ -68,15 +68,15 @@ fn graphicsaspect_system(
 
 // Systems for listening to events for this plugin will use EventReader< [event from this plugin] >
 
-// systems for listening to events for this plugin
+// Systems for listening to events for this plugin
 
 // ?? only for adding a component to listen for other graphics-related events?
 
-// This system is only necessary when creating entities that listen for CreateGraphicsEvents.
-// Is this only run if !EventReader<CreateGraphicsEvents>.is_empty()?  No.
-// We only keep around the MyPluginCreationComponent to allow despawning (any other reason?),
-// so if that can be done recursively by the entity, we probably should delete it after this.
-// How much does it cost to compute the parameters to this method each invocation?
+// This system is only necessary when creating entities that listen for CreateGraphicsAspectEvents.
+// Is this only run if !EventReader<CreateGraphicsAspectEvents>.is_empty()?  No.
+// So, after creation, since the only reason to keep around the EntityCreatorComponent is allow despawning
+// (any other reason?), if that can just be done recursively by the entity, we have no reason not to delete
+// the EntityCreatorComponent from this entity after adding its aspects.
 fn create_graphicsaspect_responder(
     settings: Local<GraphicsAspectSettings>,
     mut creategraphics_ev_reader: EventReader<CreateGraphicsAspectEvent>,
