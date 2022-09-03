@@ -148,7 +148,7 @@ fn despawn_entities(
     }
 }
 
-pub fn remove_entity_creator_components(
+fn remove_entity_creator_components(
     mut commands: Commands,
     mut ev_remove_entity_creator_component_reader: EventReader<RemoveEntityCreatorComponentEvent>,
     q: Query<Entity, With<EntityCreatorComponent>>,
@@ -489,7 +489,7 @@ fn test_1_after_each_update_many_times()
 
 #[test]
 
-fn test2()
+fn test_despawning_through_despawnentitiesevent_using_plugin_many_times()
 {
     for _ in 0..1000 {
         test_despawning_through_despawnentitiesevent_using_plugin();
@@ -497,7 +497,7 @@ fn test2()
 }
 
 #[test]
-fn test3()
+fn test_despawning_through_despawnentitiesevent_many_times()
 {
     for _ in 0..1000 {
         test_despawning_through_despawnentitiesevent();
