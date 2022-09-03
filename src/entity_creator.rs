@@ -249,9 +249,13 @@ fn test_despawn_entities()
         let e = app.world.query::<Entity>().iter(&app.world).next();    // clumsy.  better incantation?
         println!("created {:?}", e);
 
-        let mut despawn_entities_events = app.world.resource_mut::<Events<DespawnEntitiesEvent>>();
         let despawn_event = DespawnEntitiesEvent { entities: vec![e.unwrap()]};
-        despawn_entities_events.send(despawn_event);
+
+        app.world.send_event(despawn_event);
+        
+// this doesn't change the outcome, and is more verbose
+//        let mut despawn_entities_events = app.world.resource_mut::<Events<DespawnEntitiesEvent>>();
+//        despawn_entities_events.send(despawn_event);
     }
 
     app.update();
