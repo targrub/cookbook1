@@ -36,6 +36,7 @@ struct RemoveEntityCreatorComponentEvent {
     entity: Entity,
 }
 
+#[derive(Debug)]
 struct DespawnEntitiesEvent {
     entities: Vec<Entity>,
 }
@@ -137,9 +138,13 @@ fn despawn_entities(
     mut ev_despawn_entities_reader: EventReader<DespawnEntitiesEvent>,
     q: Query<Entity>,
 ) {
+    println!("despawn_entities called");
     for ev in ev_despawn_entities_reader.iter() {
+        println!("received event {:?} in despawn_entities", ev);
         for de in ev.entities.iter() {
+            println!("is this an entity in the world? {:?}", de);
             if q.contains(*de) {
+                println!("despawn() called on that entity from commands");
                 commands.entity(*de).despawn();
             }
         }
@@ -252,7 +257,7 @@ fn test_despawn_entities()
         let despawn_event = DespawnEntitiesEvent { entities: vec![e.unwrap()]};
 
         app.world.send_event(despawn_event);
-        
+
 // this doesn't change the outcome, and is more verbose
 //        let mut despawn_entities_events = app.world.resource_mut::<Events<DespawnEntitiesEvent>>();
 //        despawn_entities_events.send(despawn_event);
