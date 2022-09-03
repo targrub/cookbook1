@@ -22,7 +22,6 @@ use bevy::render::mesh::Mesh;
 
 // Elements from elsewhere in the crate
 use crate::entity_creator::EntityCreatorComponent;
-use crate::entity_creator::remove_entity_creator_components;
 
 // Private components for this plugin
 #[derive(Component)]
@@ -59,7 +58,7 @@ impl Plugin for GraphicsAspect {
             .add_event::<CreateGraphicsAspectEvent>()
             .add_event::<OtherGraphicsAspectEvent>()
             .add_system(graphicsaspect_system)
-            .add_system(create_graphicsaspect_responder.before(remove_entity_creator_components))
+            .add_system(create_graphicsaspect_responder)
             .add_system(other_graphicsaspect_event_responder)
             ;
     }
