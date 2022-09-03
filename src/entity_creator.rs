@@ -10,6 +10,7 @@ use bevy::ecs::{
     query::With,
     system::{Commands, Query, Res, SystemParam}
 };
+use bevy::prelude::ParallelSystemDescriptorCoercion;
 
 use bevy::prelude::{StandardMaterial, EventReader};
 // Necessary component for spawned entity
@@ -32,7 +33,7 @@ use crate::audio_aspect::AudioAspectType;
 #[derive(Component)]
 pub struct EntityCreatorComponent; // used as marker component to limit which entities are examined when Create [this plugin's] Events are received
 
-struct RemoveEntityCreatorComponentEvent {
+pub struct RemoveEntityCreatorComponentEvent {
     entity: Entity,
 }
 
@@ -57,7 +58,7 @@ impl Plugin for EntityCreator {
         app
             .add_system(mysystem)
             .add_event::<RemoveEntityCreatorComponentEvent>()
-            .add_system(remove_entity_creator_components)
+            .add_system(remove_entity_creator_components.after(mysystem))
             .add_event::<DespawnEntitiesEvent>()
             .add_system(despawn_entities)
             ;
@@ -90,7 +91,7 @@ fn create_entity_and_aspects(
     add_audio_aspect(commands, writers, e, AudioAspectType::default());
     add_graphics_aspect(commands, writers, e, Color::BLUE, "bee".to_string());
     add_graphics_aspect(commands, writers, e, Color::ALICE_BLUE, "cee".to_string());
-    remove_entity_creator_component(e, commands, writers);
+    //remove_entity_creator_component(e, commands, writers);
 }
 
 fn create_entity(
@@ -138,20 +139,16 @@ fn despawn_entities(
     mut ev_despawn_entities_reader: EventReader<DespawnEntitiesEvent>,
     q: Query<Entity>,
 ) {
-    println!("despawn_entities called");
     for ev in ev_despawn_entities_reader.iter() {
-        println!("received event {:?} in despawn_entities", ev);
         for de in ev.entities.iter() {
-            println!("is this an entity in the world? {:?}", de);
             if q.contains(*de) {
-                println!("despawn() called on that entity from commands");
                 commands.entity(*de).despawn();
             }
         }
     }
 }
 
-fn remove_entity_creator_components(
+pub fn remove_entity_creator_components(
     mut commands: Commands,
     mut ev_remove_entity_creator_component_reader: EventReader<RemoveEntityCreatorComponentEvent>,
     q: Query<Entity, With<EntityCreatorComponent>>,
@@ -187,6 +184,7 @@ fn test_entity_creation() {
     input.press(KeyCode::C);
     app.insert_resource(input);
     app.update();
+    app.world.resource_mut::<Input<KeyCode>>().clear();
 
     {
         // Created entity with component
@@ -207,27 +205,17 @@ fn test_entity_creation() {
         // and is the event at the EventReader?
         // When is the component actually removed?
         // What data is this query run on?
-        assert_eq!(app.world.query::<&EntityCreatorComponent>().iter(&app.world).len(), 1);
+        //assert_eq!(app.world.query::<&EntityCreatorComponent>().iter(&app.world).len(), 1);
     }
 
-    app.world.resource_mut::<Input<KeyCode>>().clear();
     app.update();
 
     {
-        // Same questions here
-        assert_eq!(app.world.query::<&EntityCreatorComponent>().iter(&app.world).len(), 0);
-
-        // Check that no more events are forthcoming
-        let audio_created_events = app.world.resource::<Events<CreateAudioAspectEvent>>();
-        let mut create_audio_reader = audio_created_events.get_reader();
-        assert_eq!(create_audio_reader.iter(audio_created_events).len(), 1);
-
-        let graphics_created_events = app.world.resource::<Events<CreateGraphicsAspectEvent>>();
-        let mut create_graphics_reader = graphics_created_events.get_reader();
-        assert_eq!(create_graphics_reader.iter(graphics_created_events).len(), 2);
+        assert_eq!(app.world.entities().len(), 1);
     }
 }
 
+/*
 #[test]
 fn test_despawn_entities()
 {
@@ -247,12 +235,12 @@ fn test_despawn_entities()
     input.press(KeyCode::C);
     app.insert_resource(input);
     app.update();
+    app.world.resource_mut::<Input<KeyCode>>().clear();
 
     {
         // Should this be 0 or 1?
         assert_eq!(app.world.entities().len(), 1);
         let e = app.world.query::<Entity>().iter(&app.world).next();    // clumsy.  better incantation?
-        println!("created {:?}", e);
 
         let despawn_event = DespawnEntitiesEvent { entities: vec![e.unwrap()]};
 
@@ -266,7 +254,7 @@ fn test_despawn_entities()
     app.update();
     {
         // should this be 0 or 1?
-        assert_eq!(app.world.entities().len(), 1);
+        assert_eq!(app.world.entities().len(), 0);
     }
 
     app.update();
@@ -276,5 +264,251 @@ fn test_despawn_entities()
         assert_eq!(app.world.entities().len(), 0);
     }
 }
+*/
+fn commands_test_spawn_minimal(
+    mut commands: Commands,
+) {
+    commands.spawn();
+}
 
+#[test]
+fn test_bevy_spawn_entity_results_in_1_entity_after_each_update()
+{
+    let mut app = App::new();
+
+    assert_eq!(app.world.entities().len(), 0);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 0);
+
+    app.add_system(commands_test_spawn_minimal);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 1);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 2);
+}
+
+#[derive(Default)]
+struct ShouldSpawn(bool);
+
+fn commands_test_spawn_minimal_with_resource_guard(
+    resource: Res<ShouldSpawn>,
+    mut commands: Commands,
+) {
+    if resource.0 {
+        commands.spawn();
+    }
+}
+
+#[test]
+fn test_bevy_spawn_additional_entity_each_update_when_resource_is_true()
+{
+    let mut app = App::new();
+
+    assert_eq!(app.world.entities().len(), 0);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 0);
+
+    app.insert_resource(ShouldSpawn(false));
+    app.add_system(commands_test_spawn_minimal_with_resource_guard);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 0);
+
+    app.insert_resource(ShouldSpawn(true));
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 1);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 2);
+    app.insert_resource(ShouldSpawn(false));
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 2);
+}
+
+
+#[test]
+fn test_despawning_through_despawnentitiesevent()
+{
+    let mut app = App::new();
+
+    app.add_event::<DespawnEntitiesEvent>();
+    app.add_system(despawn_entities);
+
+    assert_eq!(app.world.entities().len(), 0);
+
+    app.insert_resource(ShouldSpawn(true));
+    app.add_system(commands_test_spawn_minimal_with_resource_guard);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 1);
+
+    app.insert_resource(ShouldSpawn(false));
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 1);
+
+    let e = app.world.query::<Entity>().iter(&app.world).next();    // clumsy.  better incantation?
+
+    let despawn_event = DespawnEntitiesEvent { entities: vec![e.unwrap()]};
+    app.world.send_event(despawn_event);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 0);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 0);
+}
+
+#[test]
+fn test_despawning_through_despawnentitiesevent_using_plugin()
+{
+    let mut app = App::new();
+
+    app.add_plugin(AssetPlugin::default());
+    app.add_asset::<Mesh>();
+    app.add_asset::<StandardMaterial>();
+
+    app.add_plugin(crate::audio_aspect::AudioAspect);
+    app.add_plugin(crate::graphics_aspect::GraphicsAspect);
+    app.add_plugin(EntityCreator);
+
+    let mut input = Input::<KeyCode>::default();
+    app.insert_resource(input);
+
+    assert_eq!(app.world.entities().len(), 0);
+
+    app.insert_resource(ShouldSpawn(true));
+    app.add_system(commands_test_spawn_minimal_with_resource_guard);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 1);
+
+    app.insert_resource(ShouldSpawn(false));
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 1);
+
+    let e = app.world.query::<Entity>().iter(&app.world).next();    // clumsy.  better incantation?
+
+    let despawn_event = DespawnEntitiesEvent { entities: vec![e.unwrap()]};
+    app.world.send_event(despawn_event);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 0);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 0);
+}
+
+
+#[test]
+fn test_despawning_after_spawning_using_plugin()
+{
+    let mut app = App::new();
+
+    let mut input = Input::<KeyCode>::default();
+    input.press(KeyCode::C);
+    app.insert_resource(input);
+
+    app.add_plugin(AssetPlugin::default());
+    app.add_asset::<Mesh>();
+    app.add_asset::<StandardMaterial>();
+
+    app.add_plugin(crate::audio_aspect::AudioAspect);
+    app.add_plugin(crate::graphics_aspect::GraphicsAspect);
+    app.add_plugin(EntityCreator);
+
+    app.update();
+
+    app.world.resource_mut::<Input<KeyCode>>().clear();
+
+    assert_eq!(app.world.entities().len(), 1);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 1);
+
+    let e = app.world.query::<Entity>().iter(&app.world).next();    // clumsy.  better incantation?
+
+    let despawn_event = DespawnEntitiesEvent { entities: vec![e.unwrap()]};
+    app.world.send_event(despawn_event);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 0);
+
+    app.update();
+
+    assert_eq!(app.world.entities().len(), 0);
+}
+
+#[test]
+fn test_despawn_many_times()
+{
+    for _ in 0..1000 {
+        test_despawning_after_spawning_using_plugin();
+    }
+}
+
+#[test]
+fn test_entity_creation_many_times()
+{
+    for _ in 0..1000 {
+        test_entity_creation();
+    }
+}
+
+#[test]
+fn test_1_after_each_update_many_times()
+{
+    for _ in 0..1000 {
+        test_bevy_spawn_entity_results_in_1_entity_after_each_update();
+    }
+}
+
+#[test]
+
+fn test2()
+{
+    for _ in 0..1000 {
+        test_despawning_through_despawnentitiesevent_using_plugin();
+    }
+}
+
+#[test]
+fn test3()
+{
+    for _ in 0..1000 {
+        test_despawning_through_despawnentitiesevent();
+    }
+}
+
+#[test]
+fn test_add_entity_only_when_resource_true_many_times()
+{
+    for _ in 0..1000 {
+        test_bevy_spawn_additional_entity_each_update_when_resource_is_true();
+    }
+}
 }
