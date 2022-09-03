@@ -27,11 +27,17 @@ use crate::entity_creator::EntityCreatorComponent;
 struct GraphicsAspectComponent;
 
 // Public events for this plugin
-#[derive(Default)]
 pub struct CreateGraphicsAspectEvent {
-    pub entity_id: u32,
+    pub entity: Option<Entity>,
     pub name: String,
 }
+
+impl Default for CreateGraphicsAspectEvent {
+    fn default() -> Self {
+        CreateGraphicsAspectEvent { entity: None, name: String::new(), }
+    }
+}
+
 
 #[derive(Default)]
 pub struct OtherGraphicsAspectEvent {
@@ -87,18 +93,16 @@ fn create_graphicsaspect_responder(
 ) {
     // have EntityId
     for ev in creategraphics_ev_reader.iter() {
-        for e in q.iter() {
-            if ev.entity_id == e.id() {
-                // can use/modify GraphicsPluginSettings
-                // ...
+        if q.contains(ev.entity.unwrap()) {
+            // can use/modify GraphicsPluginSettings
+            // ...
 
-                // can add graphics-related components to an entity
-                commands
-                    .entity(e)
-                    .insert(GraphicsAspectComponent)
- //                   .with_children(|builder| { ...
-                    ;
-            }
+            // can add graphics-related components to an entity
+            commands
+                .entity(ev.entity.unwrap())
+                .insert(GraphicsAspectComponent)
+//                   .with_children(|builder| { ...
+                ;
         }
     }
 }

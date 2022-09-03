@@ -1,5 +1,6 @@
 use bevy::app::{App, Plugin};
 use bevy::ecs::component::Component;
+use bevy::ecs::entity::Entity;
 
 #[derive(Component)]
 struct AudioAspectComponent;
@@ -12,10 +13,15 @@ pub struct AudioAspectType;
 // ...
 
 
-#[derive(Default)]
 pub struct CreateAudioAspectEvent {
-    pub entity_id: u32,
+    pub entity: Option<Entity>,
     pub audiotype: AudioAspectType,
+}
+
+impl Default for CreateAudioAspectEvent {
+    fn default() -> Self {
+        CreateAudioAspectEvent { entity: None, audiotype: AudioAspectType::default(), }
+    }
 }
 
 pub struct AudioAspect;

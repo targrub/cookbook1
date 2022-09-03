@@ -33,11 +33,11 @@ use crate::audio_aspect::AudioAspectType;
 pub struct EntityCreatorComponent; // used as marker component to limit which entities are examined when Create [this plugin's] Events are received
 
 struct RemoveEntityCreatorComponentEvent {
-    entity_id: u32,
+    entity: Entity,
 }
 
 struct DespawnEntitiesEvent {
-    entity_ids: Vec<u32>,
+    entities: Vec<Entity>,
 }
 
 // Struct with SystemParam trait allows us to pass multiple EventWriters, EventReaders, etc., to subsystems
@@ -75,7 +75,7 @@ fn mysystem(
     }
     if input.just_pressed(KeyCode::D) {
 //        let e_ids = ;
-//        let event = DespawnEntitiesEvent { entity_ids: e_ids, }
+//        let event = DespawnEntitiesEvent { entities, }
 //        ev_despawn_entities_writer.send(event);
     }
 }
@@ -86,10 +86,10 @@ fn create_entity_and_aspects(
 )
 {
     let e = create_entity(commands, writers);
-    add_audio_aspect(commands, writers, &e, AudioAspectType::default());
-    add_graphics_aspect(commands, writers, &e, Color::BLUE, "bee".to_string());
-    add_graphics_aspect(commands, writers, &e, Color::ALICE_BLUE, "cee".to_string());
-    remove_entity_creator_component(&e, commands, writers);
+    add_audio_aspect(commands, writers, e, AudioAspectType::default());
+    add_graphics_aspect(commands, writers, e, Color::BLUE, "bee".to_string());
+    add_graphics_aspect(commands, writers, e, Color::ALICE_BLUE, "cee".to_string());
+    remove_entity_creator_component(e, commands, writers);
 }
 
 fn create_entity(
@@ -104,32 +104,32 @@ fn create_entity(
 }
 
 fn remove_entity_creator_component(
-    entity: &Entity,
+    entity: Entity,
     commands: &mut Commands,
     writers: &mut Writers,
 ) {
-    writers.ev_remove_entity_creator_component_writer.send(RemoveEntityCreatorComponentEvent {entity_id: entity.id()});
+    writers.ev_remove_entity_creator_component_writer.send(RemoveEntityCreatorComponentEvent {entity});
 }
 
 fn add_audio_aspect(
     commands: &mut Commands,
     writers: &mut Writers,
-    entity: &Entity,
+    entity: Entity,
     audiotype: AudioAspectType,
 )
 {
-    writers.ev_createaudio_writer.send(CreateAudioAspectEvent {entity_id: entity.id(), audiotype});
+    writers.ev_createaudio_writer.send(CreateAudioAspectEvent {entity: Some(entity), audiotype});
 }
 
 fn add_graphics_aspect(
     commands: &mut Commands,
     writers: &mut Writers,
-    entity: &Entity,
+    entity: Entity,
     color: Color,
     name: String,
 )
 {
-    writers.ev_creategraphics_writer.send(CreateGraphicsAspectEvent {entity_id: entity.id(), name});
+    writers.ev_creategraphics_writer.send(CreateGraphicsAspectEvent {entity: Some(entity), name});
 }
 
 fn despawn_entities(
@@ -138,11 +138,9 @@ fn despawn_entities(
     q: Query<Entity>,
 ) {
     for ev in ev_despawn_entities_reader.iter() {
-        for e in q.iter() {
-            for de in ev.entity_ids.iter() {
-                if *de == e.id() {
-                    commands.entity(e).despawn();
-                }
+        for de in ev.entities.iter() {
+            if q.contains(*de) {
+                commands.entity(*de).despawn();
             }
         }
     }
@@ -154,10 +152,8 @@ fn remove_entity_creator_components(
     q: Query<Entity, With<EntityCreatorComponent>>,
 ) {
     for ev in ev_remove_entity_creator_component_reader.iter() {
-        for e in q.iter() {
-            if ev.entity_id == e.id() {
-                commands.entity(e).remove::<EntityCreatorComponent>();
-            }
+        if q.contains(ev.entity) {
+            commands.entity(ev.entity).remove::<EntityCreatorComponent>();
         }
     }
 }
@@ -240,7 +236,7 @@ fn test_despawn_entities()
     app.add_plugin(crate::graphics_aspect::GraphicsAspect);
     app.add_plugin(EntityCreator);
 
-    assert_eq!(app.world.query::<Entity>().iter(&app.world).len(), 0);
+    assert_eq!(app.world.entities().len(), 0);
 
     let mut input = Input::<KeyCode>::default();
     input.press(KeyCode::C);
@@ -249,26 +245,26 @@ fn test_despawn_entities()
 
     {
         // Should this be 0 or 1?
-        assert_eq!(app.world.query::<Entity>().iter(&app.world).len(), 1);
-        let e = app.world.query::<Entity>().iter(&app.world).next();
+        assert_eq!(app.world.entities().len(), 1);
+        let e = app.world.query::<Entity>().iter(&app.world).next();    // clumsy.  better incantation?
         println!("created {:?}", e);
 
         let mut despawn_entities_events = app.world.resource_mut::<Events<DespawnEntitiesEvent>>();
-        let despawn_event = DespawnEntitiesEvent { entity_ids: {let mut eids = Vec::new(); eids.push(e.unwrap().id()); eids}};
+        let despawn_event = DespawnEntitiesEvent { entities: vec![e.unwrap()]};
         despawn_entities_events.send(despawn_event);
     }
 
     app.update();
     {
         // should this be 0 or 1?
-        assert_eq!(app.world.query::<Entity>().iter(&app.world).len(), 1);
+        assert_eq!(app.world.entities().len(), 1);
     }
 
     app.update();
 
     {
         // should this be 0 or 1?  WHAT? 2???
-        assert_eq!(app.world.query::<Entity>().iter(&app.world).len(), 0);
+        assert_eq!(app.world.entities().len(), 0);
     }
 }
 
