@@ -58,7 +58,7 @@ impl Plugin for EntityCreator {
         app
             .add_system(mysystem)
             .add_event::<RemoveEntityCreatorComponentEvent>()
-            .add_system(remove_entity_creator_components.after(mysystem))
+            .add_system(remove_entity_creator_components)
             .add_event::<DespawnEntitiesEvent>()
             .add_system(despawn_entities)
             ;
